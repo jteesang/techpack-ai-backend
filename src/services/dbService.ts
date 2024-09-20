@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import { TechpackForm, UploadInfo } from '../types';
+import { TechpackForm, TechpackPages, TechpackVersion, UploadInfo, UserDetails } from '../types';
 
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!;
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const SUPABASE_URL = process.env.SUPABASE_URL!;
+export const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!;
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   
 export const saveUploadDescription = async (data: UploadInfo) => {
   const { data: insertedData, error } = await supabase
@@ -19,21 +19,35 @@ export const saveUploadDescription = async (data: UploadInfo) => {
   return insertedData;
 }
 
-export const getUploadDescription = async (id: string) => {
+export const getUploadDescription = async (techpackId: string) => {
   const { data: uploadDesc, error } = await supabase
   .from('uploads')
   .select('*')
-  .eq('id', id)
+  .eq('id', techpackId)
   .single()
 
   if (error) {
-    console.error('Error getting techpack:', error);
-    throw new Error('Failed to get techpack from Techpacks table');
+    console.error('Error getting uploads:', error);
+    throw new Error('Failed to get entry from Uploads table');
   }
   return uploadDesc;
 }
 
-export const saveTechpack = async (data: TechpackForm) => {
+export const getImageUrl = async (id: string) => {
+  const { data: imageUrl, error } = await supabase
+  .from('uploads')
+  .select('image_path')
+  .eq('id', id)
+  .single()
+
+  if (error) {
+    console.error('Error getting uploads:', error);
+    throw new Error('Failed to get entry from Uploads table');
+  }
+  return imageUrl;
+}
+
+export const saveTechpackForm = async (data: TechpackForm) => {
   const { data: insertedData, error } = await supabase
     .from('techpacks')
     .insert([data])
@@ -45,11 +59,11 @@ export const saveTechpack = async (data: TechpackForm) => {
   return insertedData;
 }
 
-export const getTechpack = async (id: string) => {
+export const getTechpackForm = async (techpackId: string) => {
   const { data: techpack, error } = await supabase
     .from('techpacks')
     .select('*')
-    .eq('id', id)
+    .eq('id', techpackId)
     .single()
 
   if (error) {
@@ -59,11 +73,11 @@ export const getTechpack = async (id: string) => {
   return techpack;
 }
 
-export const checkTechpackExists = async(id : string ) => {
+export const checkTechpackFormExists = async(techpackId : string ) => {
   const { data, error } = await supabase
   .from('techpacks')
   .select('*')
-  .eq('id', id)
+  .eq('id', techpackId)
 
   if (error) {
     console.error('No entry for given techpack id', error);
@@ -71,6 +85,103 @@ export const checkTechpackExists = async(id : string ) => {
   }
   console.log(`data: ${data}`)
   return data;
+}
+
+export const saveTechpackPages = async (data: TechpackPages) => {
+  const { data: insertedData, error } = await supabase
+    .from('techpack_pages')
+    .insert([data])
+  
+  if (error) {
+    console.error('Error inserting data into techpack_pages table:', error);
+    throw new Error('Failed to insert data into techpacks_pages table');
+  }
+  return insertedData;
+}
+
+export const getUserTechpacks = async (userId: string) => {
+  const { data: techpacks, error } = await supabase
+  .from('techpacks')
+  .select('id')
+  .eq('user_id', userId)
+
+  if (error) {
+    console.error('Error getting techpacks for user id:', error);
+    throw new Error('Failed to get techpacks from Techpacks table');
+  }
+  return techpacks;
+}
+
+// use this method somewhere
+export const saveTechpackVersion = async (data: TechpackVersion) => {
+  const { data: insertedData, error } = await supabase
+  .from('techpack_versions')
+  .insert([data])
+
+  if (error) {
+    console.error('Error inserting data into techpack_versions table:', error);
+    throw new Error('Failed to insert data into techpack_versions table');
+  }
+return insertedData;
+}
+
+// use a join
+export const getTechpacksForUser = async (userId: string) => {
+  const { data: techpacks, error } = await supabase
+  .from('techpacks')
+  .select('id')
+  .eq('user_id', userId)
+
+  if (error) {
+    console.error('Error getting techpacks for user id:', error);
+    throw new Error('Failed to get techpacks from Techpacks table');
+  }
+
+  if (!techpacks || techpacks.length === 0) {
+    return [];
+  }
+
+  const techpackIds = techpacks.map(tp => tp.id);
+
+  // Fetch techpack_versions for the retrieved techpack_ids
+  const { data: versions, error: versionError } = await supabase
+  .from('techpack_versions')
+  .select('*')
+  .in('techpack_id', techpackIds);
+
+  if (versionError) {
+      console.error('Error fetching techpack versions:', versionError);
+      return [];
+  }
+
+  return versions || [];
+}
+
+export const getUserDetails = async (userId: string) => {
+  const { data: user, error } = await supabase
+  .from('users')
+  .select('*')
+  .eq('id', userId)
+  .single()
+  
+  if (error) {
+    console.error('Error getting user for user id:', error);
+    throw new Error('Failed to get user from users table');
+  }
+  return user;
+}
+
+export const saveUserDetails = async (data: UserDetails) => {
+  const { data: insertedData, error } = await supabase
+    .from('users')
+    .update([data])
+    .eq('id', data.id)
+
+  if (error) {
+    console.error('Error updating data:', error);
+    throw new Error('Failed to insert data into Users table');
+  }
+  return insertedData;
 }
 
 export const uploadImageToBucket = async (uploadName: string, file: Express.Multer.File) => {

@@ -1,39 +1,42 @@
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
-import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
+import { techPackSystemPrompt } from '../constants/prompts';
+import { ImageDescription, Techpack, TechpackForm } from '../types';
 
 dotenv.config();
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const ImageDescription = z.object({
-  description: z.string(),
-  silhouette: z.string(),
-  neckline: z.string(),
-  color: z.string(),
-  fabric: z.string(),
-  trim: z.string(),
-  decoration: z.string(),
-  fit: z.string(),
-});
-
-export const generateTechPack = async (description: string) => {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4",
+export const generateTechPack = async (imageUrl: string, techpackForm: TechpackForm) => {
+  const response = await openai.beta.chat.completions.parse({
+    model: "gpt-4o-2024-08-06",
     messages: [
       {
         role: "system",
-        content: "systemPrompt",
+        content: techPackSystemPrompt + 
+        `
+          Assume the role of an expert Technical Designer in garment manufacturing. 
+          Using the information provided by the user, create a detailed tech pack in a structured, professional format. 
+          Ensure each section is comprehensive, aligns with industry standards, and addresses the specific requirements of the garment:
+          - Brand Information: ${techpackForm.brand_name}
+          - Style ID: ${techpackForm.style_id}
+          - Style Name: ${techpackForm.style_name}
+          - Garment Description: ${techpackForm.description}
+          - Additional Information: ${techpackForm.additional_details}
+          - Size Labeling System: ${techpackForm.sizing_preference}
+          - Image URL: ${imageUrl}
+        `,
       },
       {
         role: "user",
-        content: "Generate the tech pack based on the above information.",
+        content: `Generate the tech pack based on the above information.`
       },
     ],
+    response_format: zodResponseFormat(Techpack, 'techpack'),
   })
 
-  return completion.choices[0].message.content
+  return response.choices[0]?.message;
 }
 
 export const generateImage = async (prompt: string) => {
@@ -47,8 +50,7 @@ export const generateImage = async (prompt: string) => {
   return response.data[0].url
 }
 
-export const getDescription = async (imageUrl: string) => {
-  // console.log(`before GPT call: ${Date.now()}`)
+export const generateDescription = async (imageUrl: string) => {
   const response = await openai.beta.chat.completions.parse({
     model: "gpt-4o-2024-08-06",
     messages: [
@@ -80,19 +82,34 @@ export const getDescription = async (imageUrl: string) => {
   return response.choices[0]?.message;
 }
 
-export const generateDescription = async (imageUrl: string) => {
+// This method calls a GPT model to generate a description given an image.
+export const getDescription = async (imageUrl: string) => {
   try {
-    const completion = await getDescription(imageUrl);
+    const completion = await generateDescription(imageUrl);
 
     if (completion?.parsed) {
-      console.log(`completion: ${completion.parsed}`)
       return completion.parsed;
     } else {
-      console.log(`completion: ${completion.refusal}`)
       return completion.refusal;
     }
   } catch (error) {
     console.error('Error in analyzeGarmentSketch:', error);
+    throw error;
+  }
+}
+
+// This method calls a GPT model to generate the techpack information given a description.
+export const getTechpackPages = async (imageUrl: string, techpackForm: TechpackForm) => {
+  try {
+    const completion = await generateTechPack(imageUrl, techpackForm);
+
+    if (completion?.parsed) {
+      return completion.parsed;
+    } else {
+      return completion.refusal;
+    }
+  } catch (error) {
+    console.error(`Error in getting Techpack info:`, error);
     throw error;
   }
 }
