@@ -8,8 +8,8 @@ import { UploadInfo, TechpackForm, UserDetails, TechpackVersion } from './types'
 
 dotenv.config();
 
-export const app = express()
-export const cors = require('cors');
+const app = express()
+const cors = require('cors');
 
 app.use(cors());
 app.use(express.json())
@@ -152,3 +152,5 @@ app.post('/users/:id', form.none(), async (req: Request, res: Response) => {
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
+
+export default app;
